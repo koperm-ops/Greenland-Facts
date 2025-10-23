@@ -81,8 +81,7 @@
             100% { transform: rotate(360deg); }
         }
         
-        /* TEACHER CONTROLS: Hides the fact generation buttons from student view */
-        /* This rule now only hides the seasonal button */
+        /* TEACHER CONTROLS: Hides the seasonal button */
         #teacher-controls {
             display: none;
         }
@@ -164,57 +163,8 @@
     </div>
 
     <script type="module">
-        // NOTE: Firebase imports are kept as placeholders in this environment but are not strictly needed for the API call.
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
         // Global variables provided by the environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        let auth, db;
-        let userId = null;
-
-        // Simplified Firebase Init (retained for completeness in a development environment)
-        if (Object.keys(firebaseConfig).length > 0) {
-            try {
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-                // Auth attempts are often unnecessary for a simple API call, but included here for full setup.
-                // You will need to remove all of this Firebase block for simple Google Site embedding.
-            } catch (e) {
-                console.error("Firebase initialization failed:", e);
-            }
-        }
-
-        // --- UI & Flip Logic ---
-        const flipCard = document.getElementById('flip-card');
-        const flipCardInner = document.querySelector('.flip-card-inner');
-        const factQuestionEl = document.getElementById('fact-question');
-        const factAnswerEl = document.getElementById('fact-answer');
-        const factDetailEl = document.getElementById('fact-detail');
-        const loadingIndicator = document.getElementById('loading-indicator');
-        const generalBtn = document.getElementById('general-btn');
-        const seasonalBtn = document.getElementById('seasonal-btn');
-        // Note: seasonalBtn is inside the hidden #teacher-controls div
-
-        window.toggleFlip = function() {
-            flipCard.classList.toggle('flipped');
-        }
-
-        flipCard.addEventListener('click', toggleFlip);
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === ' ' || e.key === 'Enter') {
-                e.preventDefault(); 
-                toggleFlip();
-            }
-        });
-
-        // --- GEMINI API INTEGRATION ---
+        const apiKey = ""; // The environment will inject the API key at runtime
 
         async function fetchWithExponentialBackoff(url, options, maxRetries = 5) {
             for (let i = 0; i < maxRetries; i++) {
@@ -239,8 +189,23 @@
             }
         }
 
+        // --- UI & Flip Logic ---
+        const flipCard = document.getElementById('flip-card');
+        const factQuestionEl = document.getElementById('fact-question');
+        const factAnswerEl = document.getElementById('fact-answer');
+        const factDetailEl = document.getElementById('fact-detail');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const generalBtn = document.getElementById('general-btn');
+        const seasonalBtn = document.getElementById('seasonal-btn');
+
+        window.toggleFlip = function() {
+            flipCard.classList.toggle('flipped');
+        }
+
+        // --- GEMINI API INTEGRATION ---
+
         /**
-         * Calls the Gemini API to generate a structured fact.
+         * Calls the Gemini API to generate a structured fact for ages 5-9.
          * @param {string} type - 'general' or 'fall'.
          */
         window.handleGenerateFact = async function(type) {
@@ -260,7 +225,6 @@
             // System Prompt explicitly targets ages 5-9
             const systemPrompt = "You are an expert fact generator for young students, ages 5 to 9 (K-4). Ensure the language is extremely simple, clear, and positive. Generate a single, engaging fact about science, history, or nature. The question must be short and exciting, and the detail must be easy to understand.";
 
-            const apiKey = ""; // Canvas will inject the API key
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
             const payload = {
@@ -303,16 +267,18 @@
 
                 } else {
                     console.error("Gemini API response structure error or blocked content.");
-                    factQuestionEl.textContent = "Error: Could not generate a fact. Try again!";
-                    factAnswerEl.textContent = "Error";
-                    factDetailEl.innerHTML = "<span class=\"font-bold\">Fact Detail:</span> The generator may be busy or the request failed.";
+                    // Fallback message for students (less harsh than "Error")
+                    factQuestionEl.textContent = "Oops! Generation failed. Please try again or check your network.";
+                    factAnswerEl.textContent = "Oops";
+                    factDetailEl.innerHTML = "<span class=\"font-bold\">Fact Detail:</span> The generator may be temporarily busy. Please try again in a moment.";
                 }
 
             } catch (error) {
                 console.error("API call failed:", error);
+                // Fallback message for students
                 factQuestionEl.textContent = "Oops! Generation Failed.";
                 factAnswerEl.textContent = "Connection Error";
-                factDetailEl.innerHTML = "<span class=\"font-bold\">Fact Detail:</span> Check your network connection and try again.";
+                factDetailEl.innerHTML = "<span class=\"font-bold\">Fact Detail:</span> This function may be blocked by your network firewall.";
             } finally {
                 // 3. Hide loading and re-enable buttons
                 loadingIndicator.classList.add('hidden');
@@ -321,12 +287,13 @@
             }
         };
 
-        // Initialize with the current fact on load
+        // Initialize listeners
         document.addEventListener('DOMContentLoaded', () => {
-            console.log("Fact of the Day poster loaded. Ready to generate facts.");
+            flipCard.addEventListener('click', toggleFlip);
         });
 
     </script>
 
 </body>
 </html>
+
